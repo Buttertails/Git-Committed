@@ -9,6 +9,7 @@ SENTINEL_END = "# END acmg"
 SENTINEL_BLOCK = "\n# BEGIN acmg\nacmg hook \"$1\" \"$2\" \"$3\"\n# END acmg\n"
 HOOK_SHEBANG = "#!/bin/sh\n"
 HOOK_FILENAME = "prepare-commit-msg"
+GITIGNORE_ENTRY = ".git-acmg.json"
 
 
 class Installer:
@@ -58,6 +59,30 @@ class Installer:
             hook_path,
             stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH,
         )
+
+        # Ensure .git-acmg.json is in .gitignore to prevent accidental key commits
+        self._ensure_gitignore(repo_root)
+
+    def _ensure_gitignore(self, repo_root: str) -> None:
+        """Add .git-acmg.json to .gitignore if not already present."""
+        gitignore_path = os.path.join(repo_root, ".gitignore")
+
+        if os.path.exists(gitignore_path):
+            with open(gitignore_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            # Check if already ignored (exact line or glob that would cover it)
+            lines = [line.strip() for line in content.splitlines()]
+            if GITIGNORE_ENTRY in lines:
+                return
+            # Append the entry
+            separator = "\n" if content.endswith("\n") else "\n\n"
+            with open(gitignore_path, "a", encoding="utf-8") as f:
+                f.write(f"{separator}# acmg config (may contain API keys)\n{GITIGNORE_ENTRY}\n")
+        else:
+            with open(gitignore_path, "w", encoding="utf-8") as f:
+                f.write(f"# acmg config (may contain API keys)\n{GITIGNORE_ENTRY}\n")
+
+        print(f"acmg: added {GITIGNORE_ENTRY} to .gitignore")
 
     def uninstall(self, repo_root: str) -> None:
         """Remove the acmg sentinel block from the prepare-commit-msg hook."""
